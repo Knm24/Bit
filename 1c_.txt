@@ -1,0 +1,206 @@
+<?php
+// --- Подключаем создание инфо-блока ---
+require_once __DIR__ . "/init_blocks.php";
+
+// --- Подключаем функции для загрузки/добавления данных ---
+require_once __DIR__ . "/1c_transfers.php";
+
+// --- Пример вызова обновления через агент Bitrix ---
+// Можно закомментировать, если будет CRON
+// Агент вызывает каждые 60 минут
+function updateTransfersFrom1CAgent() {
+    $url = "http://zu/ZUPB/h/GetPosition/bitrix/";
+    $login = "login";
+    $password = "password";
+
+    loadTransfersFrom1C($url, $login, $password);
+    return "updateTransfersFrom1CAgent();"; // чтобы агент повторялся
+}
+
+// Регистрация агента (один раз, через админку или код):
+// CAgent::AddAgent("updateTransfersFrom1CAgent();","main","N",3600);
+
+
+
+
+
+-----
+
+
+
+<?php
+if(!CModule::IncludeModule("iblock")) return;
+
+$iblockCode = "transfers";
+
+// Проверяем, есть ли инфоблок
+$res = CIBlock::GetList([], ["CODE"=>$iblockCode]);
+if(!$res->Fetch()) {
+
+    // --- Создание типа инфоблока ---
+    $arFields = [
+        "ID" => "transfers",
+        "SECTIONS" => "Y",
+        "IN_RSS" => "N",
+        "SORT" => 100,
+        "LANG" => [
+            "ru" => ["NAME"=>"Переводы","SECTION_NAME"=>"Разделы","ELEMENT_NAME"=>"Переводы"],
+            "en" => ["NAME"=>"Transfers","SECTION_NAME"=>"Sections","ELEMENT_NAME"=>"Transfers"]
+        ]
+    ];
+
+    $obBlocktype = new CIBlockType;
+    $ID = $obBlocktype->Add($arFields);
+
+    // --- Создание инфоблока ---
+    $arFields = [
+        "ACTIVE"=>"Y",
+        "NAME"=>"Учет переводов",
+        "CODE"=>"transfers",
+        "IBLOCK_TYPE_ID"=>"transfers",
+        "SITE_ID"=>"s1",
+        "SORT"=>500,
+        "GROUP_ID"=>["1"=>"X","2"=>"R"]
+    ];
+
+    $ib = new CIBlock;
+    $IBLOCK_ID = $ib->Add($arFields);
+
+    // --- Свойства инфоблока ---
+    $arProps = [
+        ["NAME"=>"GUID","CODE"=>"GUID","PROPERTY_TYPE"=>"S","IS_REQUIRED"=>"Y","IBLOCK_ID"=>$IBLOCK_ID],
+        ["NAME"=>"Email","CODE"=>"EMAIL","PROPERTY_TYPE"=>"S","IS_REQUIRED"=>"N","IBLOCK_ID"=>$IBLOCK_ID],
+        ["NAME"=>"Дата перевода","CODE"=>"TRANSFER_DATE","PROPERTY_TYPE"=>"S","IS_REQUIRED"=>"N","IBLOCK_ID"=>$IBLOCK_ID],
+        ["NAME"=>"Новый отдел","CODE"=>"NEW_DEPARTMENT","PROPERTY_TYPE"=>"S","IS_REQUIRED"=>"N","IBLOCK_ID"=>$IBLOCK_ID],
+        ["NAME"=>"Новая должность","CODE"=>"NEW_POSITION","PROPERTY_TYPE"=>"S","IS_REQUIRED"=>"N","IBLOCK_ID"=>$IBLOCK_ID],
+        ["NAME"=>"Отчество","CODE"=>"MIDDLE_NAME","PROPERTY_TYPE"=>"S","IS_REQUIRED"=>"N","IBLOCK_ID"=>$IBLOCK_ID],
+        ["NAME"=>"Фамилия","CODE"=>"LAST_NAME","PROPERTY_TYPE"=>"S","IS_REQUIRED"=>"N","IBLOCK_ID"=>$IBLOCK_ID]
+    ];
+
+    foreach($arProps as $arProp){
+        $ibp = new CIBlockProperty;
+        $ibp->Add($arProp);
+    }
+}
+
+
+
+
+
+-----
+
+
+<?php
+CModule::IncludeModule("iblock");
+
+// Добавление или обновление элемента
+function addOrUpdateTransfer($data){
+    $IBLOCK_ID = 5; // Заменить на фактический ID инфоблока
+    $el = new CIBlockElement;
+
+    $res = CIBlockElement::GetList([], ["IBLOCK_ID"=>$IBLOCK_ID,"PROPERTY_GUID"=>$data["GUID"]], false, false, ["ID"]);
+    if($ob = $res->GetNext()){
+        return $el->Update($ob["ID"],[
+            "NAME"=>$data["first_name"],
+            "PROPERTY_VALUES"=>[
+                "GUID"=>$data["GUID"],
+                "EMAIL"=>$data["email"],
+                "TRANSFER_DATE"=>$data["transfer_date"],
+                "NEW_DEPARTMENT"=>$data["new_department"],
+                "NEW_POSITION"=>$data["new_position"],
+                "MIDDLE_NAME"=>$data["middle_name"],
+                "LAST_NAME"=>$data["last_name"],
+            ],
+        ]);
+    } else {
+        return $el->Add([
+            "IBLOCK_ID"=>$IBLOCK_ID,
+            "NAME"=>$data["first_name"],
+            "ACTIVE"=>"Y",
+            "PROPERTY_VALUES"=>[
+                "GUID"=>$data["GUID"],
+                "EMAIL"=>$data["email"],
+                "TRANSFER_DATE"=>$data["transfer_date"],
+                "NEW_DEPARTMENT"=>$data["new_department"],
+                "NEW_POSITION"=>$data["new_position"],
+                "MIDDLE_NAME"=>$data["middle_name"],
+                "LAST_NAME"=>$data["last_name"],
+            ],
+        ]);
+    }
+}
+
+// Загрузка данных из 1С
+function loadTransfersFrom1C($url,$login,$password){
+    $context = stream_context_create([
+        "http"=>[
+            "method"=>"GET",
+            "header"=>"Authorization: Basic ".base64_encode($login.":".$password)
+        ]
+    ]);
+
+    $response = file_get_contents($url,false,$context);
+    if($response){
+        // Конвертация из Windows-1251 в UTF-8
+        $response = mb_convert_encoding($response,'UTF-8','Windows-1251');
+
+        $data = json_decode($response,true);
+        if($data){
+            foreach($data as $item){
+                addOrUpdateTransfer($item);
+            }
+        }
+    }
+}
+
+
+
+
+----
+
+
+
+<?php
+if(!defined("B_PROLOG_INCLUDED") || B_PROLOG_INCLUDED!==true) die();
+CModule::IncludeModule("iblock");
+
+$arSelect = ["ID","NAME","DATE_ACTIVE_FROM","PROPERTY_*"];
+$arFilter = ["IBLOCK_CODE"=>"transfers","ACTIVE"=>"Y"];
+$res = CIBlockElement::GetList(["DATE_CREATE"=>"DESC"], $arFilter, false, ["nTopCount"=>5], $arSelect);
+
+$arResult["ITEMS"] = [];
+while($ob = $res->GetNextElement()){
+    $arFields = $ob->GetFields();
+    $arProps = $ob->GetProperties();
+    $arFields["PROPERTIES"] = $arProps;
+    $arResult["ITEMS"][] = $arFields;
+}
+
+$this->IncludeComponentTemplate();
+
+
+
+----
+
+
+$APPLICATION->IncludeComponent(
+    "custom:transfers.list",
+    "",
+    [],
+    false
+);
+
+
+----
+
+php /bitrix/php_interface/1c_transfers.php
+
+
+
+
+$url = "http://zu/bitrix/";
+$login = "login";
+$password = "password";
+loadTransfersFrom1C($url,$login,$password);
+
+
