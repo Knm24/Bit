@@ -1,0 +1,19 @@
+if (!defined("B_PROLOG_INCLUDED") || B_PROLOG_INCLUDED !== true) die();
+
+CModule::IncludeModule("iblock");
+
+$arResult["ITEMS"] = [];
+
+$res = CIBlockElement::GetList(
+    ["ACTIVE_FROM" => "DESC"],
+    ["IBLOCK_ID" => 5, "ACTIVE" => "Y"], // Укажи свой ID инфоблока
+    false,
+    ["nTopCount" => 10],
+    ["ID", "NAME", "PROPERTY_LAST_NAME", "PROPERTY_MIDDLE_NAME", "PROPERTY_NEW_DEPARTMENT", "PROPERTY_NEW_POSITION", "PROPERTY_TRANSFER_DATE"]
+);
+
+while ($ob = $res->GetNext()) {
+    $arResult["ITEMS"][] = $ob;
+}
+
+$this->IncludeComponentTemplate();
