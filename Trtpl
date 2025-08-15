@@ -1,0 +1,33 @@
+<?if(!defined("B_PROLOG_INCLUDED") || B_PROLOG_INCLUDED!==true)die();?>
+<div class="transfers-widget">
+    <h3>Последние переводы сотрудников</h3>
+    <?if($arResult["ITEMS"]):?>
+        <div class="transfers-list">
+            <?foreach($arResult["ITEMS"] as $arItem):?>
+                <div class="transfer-item">
+                    <div class="employee-info">
+                        <strong><?=$arItem["PROPERTIES"]["LAST_NAME"]["VALUE"]?> <?=$arItem["NAME"]?></strong>
+                        <?if($arItem["PROPERTIES"]["MIDDLE_NAME"]["VALUE"]):?>
+                            <?=$arItem["PROPERTIES"]["MIDDLE_NAME"]["VALUE"]?>
+                        <?endif?>
+                    </div>
+                    <div class="transfer-details">
+                        <div class="department">Отдел: <?=$arItem["PROPERTIES"]["NEW_DEPARTMENT"]["VALUE"]?></div>
+                        <div class="position">Должность: <?=$arItem["PROPERTIES"]["NEW_POSITION"]["VALUE"]?></div>
+                        <div class="date">Дата: <?=$arItem["PROPERTIES"]["TRANSFER_DATE"]["VALUE"]?></div>
+                    </div>
+                </div>
+            <?endforeach?>
+        </div>
+    <?else:?>
+        <p>Нет данных о переводах</p>
+    <?endif?>
+</div>
+<style>
+.transfers-widget{background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding:15px;margin:20px 0;}
+.transfers-widget h3{margin:0 0 15px 0;color:#495057;font-size:16px;}
+.transfer-item{background:white;border:1px solid #e9ecef;border-radius:4px;padding:10px;margin-bottom:10px;}
+.employee-info{font-weight:bold;margin-bottom:5px;}
+.transfer-details{font-size:12px;color:#6c757d;}
+.transfer-details div{margin-bottom:2px;}
+</style>
